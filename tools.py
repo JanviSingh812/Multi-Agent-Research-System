@@ -12,7 +12,11 @@ tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 @tool
 def web_search(query : str) -> str:
     """Search the web for recent and reliable information on a topic . Returns Titles , URLs and snippets."""
-    results = tavily.search(query=query,max_results=5)
+    query = query[:400]
+    try:
+        results = tavily.search(query=query,max_results=5)
+    except Exception as e:
+        return f"Search failed: {str(e)}"
 
     out = []
 

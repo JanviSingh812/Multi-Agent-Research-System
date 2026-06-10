@@ -9,7 +9,7 @@ from tools import web_search, scrape_url
 
 # Update the string to use the current Llama 3.3 production model ID
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile", 
+    model="llama-3.1-8b-instant", 
     temperature=0
 )
 
@@ -56,7 +56,6 @@ def build_reader_agent():
     # Wrap it in an Executor so it can actually run tools
     return AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
 
-
 #writer chain 
 
 writer_prompt = ChatPromptTemplate.from_messages([
@@ -74,7 +73,7 @@ Structure the report as:
 - Conclusion
 - Sources (list all URLs found in the research)
 
-Be detailed, factual and professional."""),
+Write the report carefully. Be detailed, factual and professional."""),
 ])
 
 writer_chain = writer_prompt | llm | StrOutputParser()
@@ -106,3 +105,17 @@ One line verdict:
 
 critic_chain = critic_prompt | llm | StrOutputParser()
 
+
+#followup_chat_chain
+
+followup_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful AI assistant. You will be provided with a research report. Answer the user's follow-up questions based on the report. If the answer is not in the report, state that clearly."),
+    ("human", """Research Report:
+{report}
+
+User Question: {question}
+
+Answer:"""),
+])
+
+followup_chat_chain = followup_prompt | llm | StrOutputParser()
