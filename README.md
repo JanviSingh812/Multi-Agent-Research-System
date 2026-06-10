@@ -75,13 +75,4 @@ npm run dev
 2. Enter a topic in the search bar (e.g., "CRISPR gene editing" or "LLM Agents 2025").
 3. Click **Run Research Pipeline** and watch the agents collaborate in real-time!
 
----
 
-## 🎨 UI Showcase
-The application features a fully responsive dashboard with a live terminal, reference feed, and a premium Glassmorphic Authentication system (supporting Email, Google, and GitHub mock logins). 
-
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
-
-## 📝 License
-This project is open-source and available under the MIT License.
