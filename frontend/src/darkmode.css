@@ -1,0 +1,153 @@
+:root {
+  --bg-primary: #f8fafc;
+  --bg-panel: linear-gradient(#ffffff, #ffffff) padding-box, #e2e8f0 border-box;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --panel-hover: linear-gradient(#ffffff, #ffffff) padding-box, linear-gradient(135deg, #fb923c, #ec4899, #8b5cf6, #3b82f6, #10b981) border-box;
+}
+
+body.dark, body.dark #root, html.dark {
+  --bg-primary: #0f172a;
+  --bg-panel: linear-gradient(#1e293b, #1e293b) padding-box, #334155 border-box;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --panel-hover: linear-gradient(#1e293b, #1e293b) padding-box, linear-gradient(135deg, #fb923c, #ec4899, #8b5cf6, #3b82f6, #10b981) border-box;
+  background-color: var(--bg-primary) !important;
+  color: var(--text-main) !important;
+}
+
+body.dark .sub-title,
+body.dark .label-sm,
+body.dark .try-label,
+body.dark .slider-labels span,
+body.dark .focus-btn {
+  color: var(--text-muted) !important;
+}
+
+body.dark .action-btn {
+  background: var(--bg-panel);
+  border-color: var(--border-color);
+}
+body.dark .action-btn:hover {
+  background: var(--panel-hover);
+}
+
+body.dark .glass-panel,
+body.dark .pipe-card,
+body.dark .ref-item,
+body.dark .report-panel {
+  background: var(--bg-panel) !important;
+  color: var(--text-main) !important;
+}
+
+body.dark .glass-panel:hover,
+body.dark .pipe-card:hover,
+body.dark .ref-item:hover,
+body.dark .report-panel:hover {
+  background: var(--panel-hover) !important;
+}
+
+body.dark .search-input {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+body.dark .section-title,
+body.dark .main-title,
+body.dark .pipe-card-title,
+body.dark .ref-header {
+  color: var(--text-main);
+}
+
+body.dark .terminal-window {
+  background: #000 !important;
+}
+
+body.dark .try-chip {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+body.dark .try-chip:hover {
+  background: #334155;
+}
+
+body.dark .auth-modal-card {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border-color: #334155 !important;
+}
+
+body.dark .auth-modal-card h2,
+body.dark .auth-modal-card label,
+body.dark .auth-social-section button {
+  color: var(--text-main) !important;
+}
+body.dark .auth-input-new {
+  background: #0f172a !important;
+  color: white !important;
+  border-color: #334155 !important;
+}
+body.dark .social-btn-white {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* History Sidebar styles */
+.history-layout {
+  display: flex;
+  gap: 2rem;
+  width: 100%;
+  margin-top: 2rem;
+}
+
+.history-sidebar {
+  width: 280px;
+  background: linear-gradient(#ffffff, #ffffff) padding-box, #e2e8f0 border-box;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+body.dark .history-sidebar {
+  background: var(--bg-panel);
+}
+
+.history-item {
+  padding: 0.8rem;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.03);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+  border-left: 3px solid transparent;
+}
+body.dark .history-item {
+  background: rgba(255,255,255,0.05);
+}
+.history-item:hover, .history-item.active {
+  background: rgba(76, 20, 139, 0.1);
+  border-left-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+.history-content {
+  flex: 1;
+}
+
+body.dark .markdown-content {
+  color: var(--text-main) !important;
+}
+body.dark .markdown-content h1, 
+body.dark .markdown-content h2, 
+body.dark .markdown-content h3 {
+  color: var(--text-main) !important;
+}

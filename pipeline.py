@@ -1,4 +1,4 @@
-from agents import build_reader_agent , build_search_agent , writer_chain , critic_chain
+from agents import build_reader_agent , build_search_agent , writer_chain , critic_chain, followup_chat_chain
 import asyncio
 import json
 
@@ -121,3 +121,7 @@ async def run_research_pipeline_stream(topic: str):
     )
     yield json.dumps({"step": "critic", "status": "done", "result": state["feedback"]}) + "\n"
 
+async def run_chat_stream(report: str, question: str):
+    # We will use the stream method of the chain to stream tokens
+    async for chunk in followup_chat_chain.astream({"report": report, "question": question}):
+        yield json.dumps({"type": "chunk", "content": chunk}) + "\n"

@@ -1,6 +1,120 @@
 import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import './index.css'
+import './darkmode.css'
+
+const FollowUpChat = ({ report }) => {
+  const [question, setQuestion] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleAsk = async (e) => {
+    e.preventDefault();
+    if (!question.trim()) return;
+    
+    const newMsg = { role: 'user', content: question };
+    setMessages(prev => [...prev, newMsg]);
+    const currentQ = question;
+    setQuestion('');
+    setLoading(true);
+    
+    // We can't rely on state length synchronously for the next index, so we use a functional update
+    let aiMsgIndex = 0;
+    setMessages(prev => {
+      aiMsgIndex = prev.length;
+      return [...prev, { role: 'ai', content: '' }];
+    });
+
+    try {
+      const res = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report, question: currentQ })
+      });
+
+      if (!res.body) throw new Error("ReadableStream not supported");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6);
+            const data = JSON.parse(dataStr);
+            if (data.type === 'chunk') {
+              setMessages(prev => {
+                const newMsgs = [...prev];
+                if (newMsgs[aiMsgIndex]) {
+                  newMsgs[aiMsgIndex].content += data.content;
+                }
+                return newMsgs;
+              });
+            }
+          } else {
+             try {
+                const data = JSON.parse(line);
+                if (data.type === 'chunk') {
+                  setMessages(prev => {
+                    const newMsgs = [...prev];
+                    if (newMsgs[aiMsgIndex]) {
+                      newMsgs[aiMsgIndex].content += data.content;
+                    }
+                    return newMsgs;
+                  });
+                }
+             } catch(err) {}
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      setMessages(prev => {
+        const newMsgs = [...prev];
+        if (newMsgs[aiMsgIndex]) {
+           newMsgs[aiMsgIndex].content += "\n[Error connecting to AI]";
+        }
+        return newMsgs;
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--border-color)'}}>
+      <h3 className="section-title" style={{color: 'var(--text-main)', fontSize: '1.2rem', marginBottom: '1rem'}}>💬 Follow-Up Q&A</h3>
+      <div style={{background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)'}}>
+        <div style={{maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+          {messages.length === 0 && <p style={{color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center'}}>Ask a question about this report!</p>}
+          {messages.map((m, i) => (
+            <div key={i} style={{alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', background: m.role === 'user' ? '#3b82f6' : 'var(--bg-main)', color: m.role === 'user' ? 'white' : 'var(--text-main)', padding: '0.75rem 1rem', borderRadius: '8px', maxWidth: '80%', border: m.role === 'ai' ? '1px solid var(--border-color)' : 'none'}}>
+              <ReactMarkdown>{m.content}</ReactMarkdown>
+            </div>
+          ))}
+        </div>
+        <form onSubmit={handleAsk} style={{display: 'flex', gap: '0.5rem'}}>
+          <input 
+            type="text" 
+            placeholder="E.g., What are the main limitations mentioned?" 
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+            disabled={loading}
+            style={{flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)'}}
+          />
+          <button type="submit" disabled={loading} style={{padding: '0.75rem 1.5rem', borderRadius: '8px', background: '#3b82f6', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.7 : 1}}>
+            {loading ? '...' : 'Ask'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [topic, setTopic] = useState('LLM agents 2025')
@@ -10,7 +124,34 @@ function App() {
   
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [userId, setUserId] = useState(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState('home')
+  const [historyList, setHistoryList] = useState([])
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null)
   const [researchDepth, setResearchDepth] = useState('Standard')
+
+  useEffect(() => {
+    document.body.classList.toggle('dark', isDarkMode)
+    document.documentElement.classList.toggle('dark', isDarkMode)
+  }, [isDarkMode])
+
+  const loadHistory = async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/history?user_id=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryList(data);
+      }
+    } catch(e) { console.error(e) }
+  }
+
+  useEffect(() => {
+    if (currentPage === 'history') loadHistory();
+  }, [currentPage, userId])
   
   // Mock live logs
   const [logs, setLogs] = useState([])
@@ -39,7 +180,7 @@ function App() {
       const response = await fetch('http://localhost:8000/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic })
+        body: JSON.stringify({ topic, user_id: userId })
       });
 
       if (!response.body) throw new Error('ReadableStream not yet supported in this browser.');
@@ -121,7 +262,29 @@ function App() {
     return `${baseClass} card-inactive`;
   }
 
-  const AuthCardContent = () => (
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    const endpoint = authMode === 'login' ? '/api/login' : '/api/signup';
+    try {
+      const res = await fetch(`http://localhost:8000${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserId(data.id);
+        setIsAuthenticated(true);
+        setIsLoginPage(false);
+        setShowAuthModal(false);
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.detail}`);
+      }
+    } catch(e) { console.error(e); alert('Connection error'); }
+  }
+
+  const renderAuthCardContent = () => (
     <div className="auth-card-inner">
       <div style={{ padding: '2rem 2rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center' }}>
         <div style={{ width: '48px', height: '48px', position: 'relative' }}>
@@ -149,14 +312,14 @@ function App() {
       </div>
 
       <div className="auth-body">
-        <form className="auth-form" onSubmit={(e) => { e.preventDefault(); setIsAuthenticated(true); setIsLoginPage(false); setShowAuthModal(false); }}>
+        <form className="auth-form" onSubmit={handleAuth}>
            <div className="auth-field">
              <label>Email</label>
-             <input type="email" placeholder="name@example.com" className="auth-input-new" required />
+             <input type="email" placeholder="name@example.com" className="auth-input-new" required value={email} onChange={e=>setEmail(e.target.value)} />
            </div>
            <div className="auth-field">
              <label>Password</label>
-             <input type="password" placeholder="••••••••" className="auth-input-new" required />
+             <input type="password" placeholder="••••••••" className="auth-input-new" required value={password} onChange={e=>setPassword(e.target.value)} />
            </div>
            
            <button type="submit" className="auth-submit-btn-new">
@@ -198,7 +361,7 @@ function App() {
           <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
         <div className="auth-modal-card" style={{ animation: 'fadeIn 0.5s ease-out' }}>
-          <AuthCardContent />
+          {renderAuthCardContent()}
         </div>
       </div>
     );
@@ -214,7 +377,7 @@ function App() {
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
             <div className="auth-modal-card" onClick={e => e.stopPropagation()}>
-              <AuthCardContent />
+              {renderAuthCardContent()}
             </div>
           </div>
         </div>
@@ -223,12 +386,36 @@ function App() {
       {/* Header */}
       <div className="header-wrapper">
         <div className="top-right-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+           <button className="action-btn" onClick={() => setIsDarkMode(!isDarkMode)} title="Toggle Dark Mode" style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
+             {isDarkMode ? (
+               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: '#facc15'}}>
+                 <circle cx="12" cy="12" r="5"></circle>
+                 <line x1="12" y1="1" x2="12" y2="3"></line>
+                 <line x1="12" y1="21" x2="12" y2="23"></line>
+                 <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                 <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                 <line x1="1" y1="12" x2="3" y2="12"></line>
+                 <line x1="21" y1="12" x2="23" y2="12"></line>
+                 <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+               </svg>
+             ) : (
+               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: '#4c148b'}}>
+                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+               </svg>
+             )}
+           </button>
+           {isAuthenticated && (
+             <button className="btn-run" onClick={() => setCurrentPage(currentPage === 'home' ? 'history' : 'home')} style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.9rem', borderRadius: '20px', background: '#3b82f6' }}>
+               {currentPage === 'home' ? 'History' : 'Home'}
+             </button>
+           )}
            {!isAuthenticated ? (
              <button className="btn-run" onClick={() => setShowAuthModal(true)} style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.9rem', borderRadius: '20px' }}>
                Sign In
              </button>
            ) : (
-             <button className="btn-run" onClick={() => setIsAuthenticated(false)} style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.9rem', borderRadius: '20px', background: '#ec4899' }}>
+             <button className="btn-run" onClick={() => { setIsAuthenticated(false); setUserId(null); setCurrentPage('home'); }} style={{ width: 'auto', padding: '0.5rem 1.2rem', fontSize: '0.9rem', borderRadius: '20px', background: '#ec4899' }}>
                Sign Out
              </button>
            )}
@@ -240,8 +427,48 @@ function App() {
         </p>
       </div>
 
-      {/* Main Grid */}
-      <div className="dashboard-grid">
+      {currentPage === 'history' ? (
+        <div className="history-layout">
+          <div className="history-sidebar">
+            <h3 style={{fontSize: '1rem', marginBottom: '0.5rem', color: 'var(--text-main)'}}>Search History</h3>
+            {historyList.length === 0 && <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>No history found.</p>}
+            {historyList.map(item => (
+              <div key={item.id} className={`history-item ${selectedHistoryItem?.id === item.id ? 'active' : ''}`} onClick={() => {
+                setSelectedHistoryItem(item);
+              }}>
+                <div style={{fontWeight: 600, marginBottom: '0.2rem'}}>{item.topic}</div>
+                <div style={{fontSize: '0.7rem', color: 'var(--text-muted)'}}>{new Date(item.timestamp).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+          <div className="history-content">
+            {selectedHistoryItem ? (
+              <div className="glass-panel" style={{height: '100%', overflowY: 'auto', padding: '2rem'}}>
+                <h2 className="section-title" style={{color: '#4c148b', marginBottom: '1.5rem'}}>{selectedHistoryItem.topic}</h2>
+                <div className="markdown-content">
+                  <ReactMarkdown
+                    components={{
+                      a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" style={{color: '#3b82f6', textDecoration: 'underline'}} />
+                    }}
+                  >
+                    {selectedHistoryItem.result}
+                  </ReactMarkdown>
+                </div>
+                
+                {/* Embedded Follow-Up Chat for History */}
+                <FollowUpChat report={selectedHistoryItem.result} />
+              </div>
+            ) : (
+              <div className="glass-panel" style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)'}}>
+                Select an item from history to view the full report here.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Main Grid */}
+          <div className="dashboard-grid">
         
         {/* Left Column */}
         <div className="left-col">
@@ -419,15 +646,17 @@ function App() {
               try { domain = new URL(url).hostname; } catch(e){}
               
               return (
-              <div className="ref-item" key={idx}>
-                <div className="ref-url-group">
-                  <div className="ref-favicon">{domain.charAt(0).toUpperCase()}</div>
-                  <div className="ref-url" title={url}>{url}</div>
+              <a href={url} target="_blank" rel="noopener noreferrer" style={{textDecoration: 'none', color: 'inherit', display: 'block'}} key={idx}>
+                <div className="ref-item" style={{cursor: 'pointer'}}>
+                  <div className="ref-url-group">
+                    <div className="ref-favicon">{domain.charAt(0).toUpperCase()}</div>
+                    <div className="ref-url" title={url}>{url}</div>
+                  </div>
+                  <div className="ref-quality">
+                    Quality <span className="star-icon">★★</span>
+                  </div>
                 </div>
-                <div className="ref-quality">
-                  Quality <span className="star-icon">★★</span>
-                </div>
-              </div>
+              </a>
             )})}
           </div>
         </div>
@@ -438,7 +667,13 @@ function App() {
         <div className="report-panel">
             <h2 className="section-title" style={{color: '#4c148b', marginBottom: '1.5rem'}}>📝 Final Research Report</h2>
             <div className="markdown-content">
-               <ReactMarkdown>{results.writer.result}</ReactMarkdown>
+               <ReactMarkdown
+                 components={{
+                   a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" style={{color: '#3b82f6', textDecoration: 'underline'}} />
+                 }}
+               >
+                 {results.writer.result}
+               </ReactMarkdown>
             </div>
             
             {results.critic?.result && (
@@ -449,7 +684,12 @@ function App() {
                 </div>
               </div>
             )}
+
+            {/* Embedded Follow-Up Chat for Live Report */}
+            <FollowUpChat report={results.writer.result} />
         </div>
+      )}
+      </>
       )}
 
     </div>

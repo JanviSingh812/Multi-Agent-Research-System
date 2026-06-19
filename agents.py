@@ -7,7 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 from tools import web_search, scrape_url
 
 
-# Update the string to use the current Llama 3.3 production model ID
+# Update the string to use the robust llama-3.1-8b-instant model
 llm = ChatGroq(
     model="llama-3.1-8b-instant", 
     temperature=0
@@ -17,7 +17,7 @@ llm = ChatGroq(
 search_prompt = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are an expert research agent. Analyze the conversation history, then use your web search tool to find accurate, up-to-date information."
+        "You are an expert research agent. You must ALWAYS use the `web_search` tool to find accurate information. Do not answer directly. Output a valid tool call to `web_search` with a `query` parameter."
     ),
     MessagesPlaceholder(variable_name="messages"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -26,7 +26,7 @@ search_prompt = ChatPromptTemplate.from_messages([
 reader_prompt = ChatPromptTemplate.from_messages([
     (
         "system", 
-        "You are an expert document reader. Analyze the conversation history, then use your scrape tool to extract full details from the provided URLs."
+        "You are an expert document reader. You must ALWAYS use the `scrape_url` tool to extract full details from the provided URLs. Do not answer directly. Output a valid tool call to `scrape_url` with a `url` parameter."
     ),
     MessagesPlaceholder(variable_name="messages"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -42,7 +42,7 @@ def build_search_agent():
         prompt=search_prompt  # Pass the required prompt here
     )
     # Wrap it in an Executor so it can actually run tools
-    return AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+    return AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True, max_iterations=3)
 
 # 4. Fixed 2nd Agent 
 def build_reader_agent():
@@ -54,7 +54,7 @@ def build_reader_agent():
         prompt=reader_prompt  # Pass the required prompt here
     )
     # Wrap it in an Executor so it can actually run tools
-    return AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+    return AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True, max_iterations=3)
 
 #writer chain 
 
@@ -71,7 +71,7 @@ Structure the report as:
 - Introduction
 - Key Findings (minimum 3 well-explained points)
 - Conclusion
-- Sources (list all URLs found in the research)
+- Sources (format all URLs found in the research as clickable markdown links, e.g. [Source Title](URL))
 
 Write the report carefully. Be detailed, factual and professional."""),
 ])
